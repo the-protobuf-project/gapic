@@ -57,6 +57,11 @@ brews:
     homepage: 'https://github.com/the-protobuf-project/gapic'
     description: 'GAPIC protoc plugin for Go (protoc-gen-go_gapic), redistributed from googleapis/gapic-generator-go'
     license: 'Apache-2.0'
+    # The release publishes on the prefixed tag (go-v0.62.0), but GoReleaser's
+    # .Tag is the derived semver (v0.62.0, from GORELEASER_CURRENT_TAG). Point the
+    # download URL at the REAL release tag (RELEASE_TAG=$GITHUB_REF_NAME, set in
+    # the workflow) so `brew install` resolves — otherwise it 404s.
+    url_template: 'https://github.com/the-protobuf-project/gapic/releases/download/{{ .Env.RELEASE_TAG }}/{{ .ArtifactName }}'
     ids:
       - protoc-gen-go_gapic-archive
     install: |
@@ -79,6 +84,8 @@ scoops:
     homepage: 'https://github.com/the-protobuf-project/gapic'
     description: 'GAPIC protoc plugin for Go (protoc-gen-go_gapic)'
     license: 'Apache-2.0'
+    # Same as brews: point downloads at the real release tag, not the derived .Tag.
+    url_template: 'https://github.com/the-protobuf-project/gapic/releases/download/{{ .Env.RELEASE_TAG }}/{{ .ArtifactName }}'
     ids:
       - protoc-gen-go_gapic-archive
 

@@ -46,6 +46,9 @@ jobs:
           args: release --clean --config .github/release/goreleaser-go.yaml
         env:
           GORELEASER_CURRENT_TAG: ${{ steps.ver.outputs.tag }}
+          # Real release tag (go-v0.62.0); brew/scoop url_template uses this so
+          # download URLs match where assets are published, not the derived v-tag.
+          RELEASE_TAG: ${{ github.ref_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # PAT with repo scope on the-protobuf-project/homebrew-tap
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
