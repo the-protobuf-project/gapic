@@ -1,0 +1,84 @@
+version: 2
+project_name: protoc-gen-go_gapic
+
+# Monorepo mode: this aggregator holds several plugins, each released under its
+# own namespaced tag. The Go plugin uses tags like `go-v0.62.0`; tag_prefix
+# strips `go-` so {{.Version}} == 0.62.0, and `dir` makes builds/archives/files
+# resolve relative to the gapic-go submodule.
+monorepo:
+  tag_prefix: go-
+  dir: gapic-go
+
+builds:
+  - id: protoc-gen-go_gapic
+    binary: protoc-gen-go_gapic
+    main: ./cmd/protoc-gen-go_gapic # relative to monorepo.dir (gapic-go)
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+
+archives:
+  - id: protoc-gen-go_gapic-archive
+    formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    files:
+      - LICENSE
+      - README.md
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  version_template: '{{ incpatch .Version }}-next'
+
+changelog:
+  disable: true # upstream-driven; we mirror versions, not author changelogs
+
+# Homebrew cask committed to the tap on each release. url + sha256 for every
+# platform are filled in automatically from the archives above.
+homebrew_casks:
+  - name: protoc-gen-go-gapic # cask tokens disallow underscores; binary keeps it
+    repository:
+      owner: the-protobuf-project
+      name: homebrew-tap
+      token: '{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}'
+    directory: Casks
+    homepage: 'https://github.com/the-protobuf-project/gapic'
+    description: 'GAPIC protoc plugin for Go (protoc-gen-go_gapic), redistributed from googleapis/gapic-generator-go'
+    ids:
+      - protoc-gen-go_gapic-archive
+    binaries:
+      - protoc-gen-go_gapic
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/protoc-gen-go_gapic"]
+          end
+
+release:
+  # Defaults to the current repository (the aggregator); no owner/name override.
+  draft: false
+  prerelease: auto
+  name_template: 'protoc-gen-go_gapic {{ .Version }}'
+  header: |
+    ## protoc-gen-go_gapic {{ .Version }}
+
+    GAPIC code generator plugin for Go, redistributed from
+    [googleapis/gapic-generator-go](https://github.com/googleapis/gapic-generator-go)
+    at upstream version {{ .Version }}. Download the binary for your platform below.
+
+    ### Install (Homebrew)
+    ```bash
+    brew install the-protobuf-project/tap/protoc-gen-go-gapic
+    ```

@@ -1,0 +1,81 @@
+name: Sync upstream & release
+
+# Pulls the latest upstream code into each submodule, detects whether any
+# generator's version changed, and — for those that did — commits the submodule
+# bump and pushes a namespaced tag (go-v* / ts-v* / py-v*) that fans out to the
+# per-language release workflows.
+#
+# Tags are pushed with RELEASE_PAT (NOT the default GITHUB_TOKEN) so that the
+# release-*.yml workflows are actually triggered by the tag push.
+
+on:
+  schedule:
+    - cron: '0 6 */3 * *' # every ~3 days at 06:00 UTC
+  workflow_dispatch: {} # manual "sync now" button
+  repository_dispatch:
+    types: [sync]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.RELEASE_PAT }}
+
+      - name: Update submodules to latest upstream
+        run: git submodule update --remote --recursive
+
+      - name: Detect version changes
+        id: detect
+        run: bash scripts/detect-versions.sh
+
+      - name: Commit, tag & push releases
+        env:
+          GO_V: ${{ steps.detect.outputs.go_version }}
+          TS_V: ${{ steps.detect.outputs.ts_version }}
+          PY_V: ${{ steps.detect.outputs.py_version }}
+          GO_CHANGED: ${{ steps.detect.outputs.go_changed }}
+          TS_CHANGED: ${{ steps.detect.outputs.ts_changed }}
+          PY_CHANGED: ${{ steps.detect.outputs.py_changed }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Record current upstream versions as the new released state.
+          jq -n --arg go "$GO_V" --arg ts "$TS_V" --arg py "$PY_V" \
+            '{go:$go, ts:$ts, py:$py}' > .released-versions.json
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No upstream changes; nothing to do."
+            exit 0
+          fi
+          git commit -m "chore: sync upstream (go=$GO_V ts=$TS_V py=$PY_V)"
+
+          tags=()
+          [ "$GO_CHANGED" = "true" ] && tags+=("go-v$GO_V")
+          [ "$TS_CHANGED" = "true" ] && tags+=("ts-v$TS_V")
+          [ "$PY_CHANGED" = "true" ] && tags+=("py-v$PY_V")
+
+          for t in "${tags[@]:-}"; do
+            [ -z "$t" ] && continue
+            echo "Tagging $t"
+            git tag -a "$t" -m "$t"
+          done
+
+          git push origin HEAD
+          if [ "${#tags[@]}" -gt 0 ]; then
+            git push origin "${tags[@]}"
+          fi

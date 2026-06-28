@@ -1,0 +1,12 @@
+[submodule "gapic-go"]
+	path = gapic-go
+	url = https://github.com/googleapis/gapic-generator-go.git
+	branch = main
+[submodule "gapic-node"]
+	path = gapic-node
+	url = https://github.com/googleapis/google-cloud-node.git
+	branch = main
+[submodule "gapic-python"]
+	path = gapic-python
+	url = https://github.com/googleapis/google-cloud-python.git
+	branch = main

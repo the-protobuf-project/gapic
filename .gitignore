@@ -1,0 +1,5 @@
+dist/
+tap/
+*.tar.gz
+*.zip
+.DS_Store

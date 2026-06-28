@@ -1,0 +1,105 @@
+name: Release Python plugin
+
+on:
+  push:
+    tags: ['py-v*']
+
+permissions:
+  contents: write
+
+env:
+  GEN_DIR: gapic-python/packages/gapic-generator
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Resolve version from tag
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#py-v}" >>"$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build sdist + wheel
+        id: build
+        working-directory: ${{ env.GEN_DIR }}
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade build
+          python -m build
+          SDIST=$(ls dist/*.tar.gz | head -n1)
+          WHEEL=$(ls dist/*.whl | head -n1)
+          SHA=$(shasum -a 256 "$SDIST" | awk '{print $1}')
+          echo "sdist_path=${GEN_DIR}/$SDIST" >>"$GITHUB_OUTPUT"
+          echo "wheel_path=${GEN_DIR}/$WHEEL" >>"$GITHUB_OUTPUT"
+          echo "sdist_name=$(basename "$SDIST")" >>"$GITHUB_OUTPUT"
+          echo "sha256=$SHA" >>"$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" \
+            --title "protoc-gen-python_gapic ${VERSION}" \
+            --notes "GAPIC code generator plugin for Python (protoc-gen-python_gapic), redistributed from googleapis/gapic-generator-python (vendored in google-cloud-python) at upstream version ${VERSION}.
+
+          ### Install (Homebrew)
+          \`\`\`bash
+          brew install the-protobuf-project/tap/protoc-gen-python-gapic
+          \`\`\`" \
+            "${{ steps.build.outputs.sdist_path }}" \
+            "${{ steps.build.outputs.wheel_path }}"
+
+      - name: Publish Homebrew formula to tap
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          SHA256: ${{ steps.build.outputs.sha256 }}
+          SDIST_NAME: ${{ steps.build.outputs.sdist_name }}
+        run: |
+          set -euo pipefail
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${SDIST_NAME}"
+          git clone --depth 1 "https://x-access-token:${TAP_TOKEN}@github.com/the-protobuf-project/homebrew-tap.git" tap
+          mkdir -p tap/Formula
+          cat > tap/Formula/protoc-gen-python-gapic.rb <<EOF
+          class ProtocGenPythonGapic < Formula
+            include Language::Python::Virtualenv
+
+            desc "GAPIC protoc plugin for Python (protoc-gen-python_gapic)"
+            homepage "https://github.com/the-protobuf-project/gapic"
+            url "${URL}"
+            sha256 "${SHA256}"
+            license "Apache-2.0"
+            version "${VERSION}"
+
+            depends_on "python@3.12"
+
+            def install
+              venv = virtualenv_create(libexec, "python3.12")
+              # Install our published sdist (present in buildpath); deps from PyPI.
+              system libexec/"bin/pip", "install", "--find-links=#{buildpath}", "gapic-generator==#{version}"
+              bin.install_symlink libexec/"bin/protoc-gen-python_gapic"
+            end
+
+            test do
+              assert_predicate bin/"protoc-gen-python_gapic", :executable?
+            end
+          end
+          EOF
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/protoc-gen-python-gapic.rb
+          git commit -m "protoc-gen-python-gapic ${VERSION}" || { echo "no change"; exit 0; }
+          git push
