@@ -32,3 +32,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # PAT with repo scope on the-protobuf-project/homebrew-tap
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          # Optional: set this secret + create the-protobuf-project/scoop-bucket
+          # to also publish a Windows Scoop manifest. Unset => Scoop step skipped.
+          SCOOP_BUCKET_GITHUB_TOKEN: ${{ secrets.SCOOP_BUCKET_GITHUB_TOKEN }}

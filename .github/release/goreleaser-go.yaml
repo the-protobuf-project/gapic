@@ -44,27 +44,43 @@ snapshot:
 changelog:
   disable: true # upstream-driven; we mirror versions, not author changelogs
 
-# Homebrew cask committed to the tap on each release. url + sha256 for every
-# platform are filled in automatically from the archives above.
-homebrew_casks:
-  - name: protoc-gen-go-gapic # cask tokens disallow underscores; binary keeps it
+# Homebrew FORMULA (not a cask) committed to the tap on each release. A formula
+# works on both macOS and Linux (Linuxbrew); goreleaser auto-emits per-OS /
+# per-arch (darwin+linux x amd64+arm64) blocks with url + sha256 filled in from
+# the archives above. (A cask would be macOS-only — hence formula.)
+brews:
+  - name: protoc-gen-go-gapic # formula tokens use hyphens; binary keeps underscore
     repository:
       owner: the-protobuf-project
       name: homebrew-tap
       token: '{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}'
-    directory: Casks
+    directory: Formula
     homepage: 'https://github.com/the-protobuf-project/gapic'
     description: 'GAPIC protoc plugin for Go (protoc-gen-go_gapic), redistributed from googleapis/gapic-generator-go'
+    license: 'Apache-2.0'
     ids:
       - protoc-gen-go_gapic-archive
-    binaries:
-      - protoc-gen-go_gapic
-    hooks:
-      post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/protoc-gen-go_gapic"]
-          end
+    install: |
+      bin.install "protoc-gen-go_gapic"
+    test: |
+      assert_predicate bin/"protoc-gen-go_gapic", :executable?
+
+# Windows: amd64/arm64 zips are already on the GitHub Release. This optional
+# Scoop manifest gives Windows users a native installer. It self-disables unless
+# SCOOP_BUCKET_GITHUB_TOKEN is set, so releases never break if you skip Windows.
+scoops:
+  - disable: '{{ if isEnvSet "SCOOP_BUCKET_GITHUB_TOKEN" }}false{{ else }}true{{ end }}'
+    name: protoc-gen-go_gapic
+    repository:
+      owner: the-protobuf-project
+      name: scoop-bucket
+      token: '{{ envOrDefault "SCOOP_BUCKET_GITHUB_TOKEN" "" }}'
+    directory: bucket
+    homepage: 'https://github.com/the-protobuf-project/gapic'
+    description: 'GAPIC protoc plugin for Go (protoc-gen-go_gapic)'
+    license: 'Apache-2.0'
+    ids:
+      - protoc-gen-go_gapic-archive
 
 release:
   # Defaults to the current repository (the aggregator); no owner/name override.
