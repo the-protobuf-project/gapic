@@ -1,18 +1,17 @@
 version: 2
 project_name: protoc-gen-go_gapic
 
-# Monorepo mode: this aggregator holds several plugins, each released under its
-# own namespaced tag. The Go plugin uses tags like `go-v0.62.0`; tag_prefix
-# strips `go-` so {{.Version}} == 0.62.0, and `dir` makes builds/archives/files
-# resolve relative to the gapic-go submodule.
-monorepo:
-  tag_prefix: go-
-  dir: gapic-go
+# This aggregator holds several plugins, each released under its own namespaced
+# tag (e.g. the Go plugin uses `go-v0.62.0`). Pro's `monorepo` mode would strip
+# the `go-` prefix automatically, but on OSS we instead derive the clean semver
+# in the workflow and pass it via GORELEASER_CURRENT_TAG, so {{.Version}} == 0.62.0.
+# The build's `dir` points at the gapic-go submodule (Pro's monorepo.dir on OSS).
 
 builds:
   - id: protoc-gen-go_gapic
     binary: protoc-gen-go_gapic
-    main: ./cmd/protoc-gen-go_gapic # relative to monorepo.dir (gapic-go)
+    dir: gapic-go
+    main: ./cmd/protoc-gen-go_gapic # relative to builds[].dir (gapic-go)
     env:
       - CGO_ENABLED=0
     goos: [linux, darwin, windows]
@@ -66,10 +65,11 @@ brews:
       assert_predicate bin/"protoc-gen-go_gapic", :executable?
 
 # Windows: amd64/arm64 zips are already on the GitHub Release. This optional
-# Scoop manifest gives Windows users a native installer. It self-disables unless
-# SCOOP_BUCKET_GITHUB_TOKEN is set, so releases never break if you skip Windows.
+# Scoop manifest gives Windows users a native installer. The upload self-skips
+# unless SCOOP_BUCKET_GITHUB_TOKEN is set, so releases never break if you skip
+# Windows. (`disable` is Pro-only; `skip_upload` is the OSS equivalent.)
 scoops:
-  - disable: '{{ if isEnvSet "SCOOP_BUCKET_GITHUB_TOKEN" }}false{{ else }}true{{ end }}'
+  - skip_upload: '{{ if isEnvSet "SCOOP_BUCKET_GITHUB_TOKEN" }}false{{ else }}true{{ end }}'
     name: protoc-gen-go_gapic
     repository:
       owner: the-protobuf-project

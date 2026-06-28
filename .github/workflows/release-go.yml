@@ -22,13 +22,30 @@ jobs:
         with:
           go-version-file: gapic-go/go.mod
 
+      # OSS GoReleaser rejects the non-semver `go-v…` tag, and its release-tag
+      # override is Pro-only. So strip the `go-` prefix to a valid semver tag
+      # (go-v0.62.0 -> v0.62.0), create it locally at this commit, and point
+      # GoReleaser at it via GORELEASER_CURRENT_TAG. The GitHub release will be
+      # published on this `v…` tag.
+      - name: Derive semver tag
+        id: ver
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#go-}"   # go-v0.62.0 -> v0.62.0
+          git tag "$TAG" "$GITHUB_SHA"
+          echo "tag=$TAG" >>"$GITHUB_OUTPUT"
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
-          version: '~> v2'
+          # Pinned to 2.15.x: the `brews` (Homebrew formula) section is removed in
+          # v2.16+, and its replacement `homebrew_casks` is macOS-only (drops
+          # Linuxbrew). `~> v2.15.0` => >= 2.15.0, < 2.16.0 (latest 2.15 patch).
+          version: '~> v2.15.0'
           args: release --clean --config .github/release/goreleaser-go.yaml
         env:
+          GORELEASER_CURRENT_TAG: ${{ steps.ver.outputs.tag }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # PAT with repo scope on the-protobuf-project/homebrew-tap
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
