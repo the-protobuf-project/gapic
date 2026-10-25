@@ -35,8 +35,14 @@ jobs:
           npm ci
           npm run compile
           test -f build/typescript/src/protoc-plugin.js
+          # Upstream lists nunjucks as a devDependency, but the templater imports
+          # it at runtime. Promote it so the prune below keeps it (and its deps).
+          npm pkg set "dependencies.nunjucks=$(npm pkg get devDependencies.nunjucks | tr -d '"')"
+          npm pkg delete devDependencies.nunjucks
           # Drop dev deps so the bundled node_modules is runtime-only.
           npm prune --omit=dev
+          # Fail the release if a runtime import went missing in the prune.
+          node --input-type=module -e "await import('./build/typescript/src/templater.js')"
 
       - name: Stage self-contained tarball
         id: pack
@@ -106,6 +112,9 @@ jobs:
 
             test do
               assert_predicate bin/"protoc-gen-typescript_gapic", :executable?
+              # Loading the templater fails if a runtime dependency is missing.
+              system Formula["node"].opt_bin/"node", "--input-type=module", "-e",
+                     "await import('#{libexec}/build/typescript/src/templater.js')"
             end
           end
           EOF
