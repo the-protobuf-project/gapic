@@ -2,7 +2,7 @@ name: Sync upstream & release
 
 # Pulls the latest upstream code into each submodule, detects whether any
 # generator's version changed, and — for those that did — commits the submodule
-# bump and pushes a namespaced tag (go-v* / ts-v* / py-v*) that fans out to the
+# bump and pushes a namespaced tag (go-v* / ts-v* / py-v* / rs-v*) that fans out to the
 # per-language release workflows.
 #
 # Tags are pushed with RELEASE_PAT (NOT the default GITHUB_TOKEN) so that the
@@ -45,29 +45,32 @@ jobs:
           GO_V: ${{ steps.detect.outputs.go_version }}
           TS_V: ${{ steps.detect.outputs.ts_version }}
           PY_V: ${{ steps.detect.outputs.py_version }}
+          RS_V: ${{ steps.detect.outputs.rs_version }}
           GO_CHANGED: ${{ steps.detect.outputs.go_changed }}
           TS_CHANGED: ${{ steps.detect.outputs.ts_changed }}
           PY_CHANGED: ${{ steps.detect.outputs.py_changed }}
+          RS_CHANGED: ${{ steps.detect.outputs.rs_changed }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           # Record current upstream versions as the new released state.
-          jq -n --arg go "$GO_V" --arg ts "$TS_V" --arg py "$PY_V" \
-            '{go:$go, ts:$ts, py:$py}' > .released-versions.json
+          jq -n --arg go "$GO_V" --arg ts "$TS_V" --arg py "$PY_V" --arg rs "$RS_V" \
+            '{go:$go, ts:$ts, py:$py, rs:$rs}' > .released-versions.json
 
           git add -A
           if git diff --cached --quiet; then
             echo "No upstream changes; nothing to do."
             exit 0
           fi
-          git commit -m "chore: sync upstream (go=$GO_V ts=$TS_V py=$PY_V)"
+          git commit -m "chore: sync upstream (go=$GO_V ts=$TS_V py=$PY_V rs=$RS_V)"
 
           tags=()
           [ "$GO_CHANGED" = "true" ] && tags+=("go-v$GO_V")
           [ "$TS_CHANGED" = "true" ] && tags+=("ts-v$TS_V")
           [ "$PY_CHANGED" = "true" ] && tags+=("py-v$PY_V")
+          [ "$RS_CHANGED" = "true" ] && tags+=("rs-v$RS_V")
 
           for t in "${tags[@]:-}"; do
             [ -z "$t" ] && continue

@@ -2,8 +2,8 @@
 #
 # setup-repo.sh — one-time bootstrap of the aggregator repo.
 #
-# Converts the three existing upstream clones (gapic-go, gapic-node,
-# gapic-python) into git submodules WITHOUT re-downloading them, wires up the
+# Converts the existing upstream clones (gapic-go, gapic-node,
+# gapic-python, gapic-rust) into git submodules WITHOUT re-downloading them, wires up the
 # remote, and (optionally) creates the GitHub repos + secrets.
 #
 # Run once, from the repo root. Re-running is safe-ish but intended for a fresh
@@ -24,7 +24,7 @@ fi
 
 # Register each existing clone as a submodule gitlink, reusing the on-disk clone
 # (no fresh clone of the multi-GB monorepos). .gitmodules already declares them.
-for path in gapic-go gapic-node gapic-python; do
+for path in gapic-go gapic-node gapic-python gapic-rust; do
   [ -d "$path/.git" ] || { echo "missing clone: $path" >&2; exit 1; }
   sha=$(git -C "$path" rev-parse HEAD)
   echo "==> registering submodule $path @ ${sha:0:10}"

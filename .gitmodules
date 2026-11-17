@@ -10,3 +10,7 @@
 	path = gapic-python
 	url = https://github.com/googleapis/google-cloud-python.git
 	branch = main
+[submodule "gapic-rust"]
+	path = gapic-rust
+	url = https://github.com/googleapis/librarian.git
+	branch = main

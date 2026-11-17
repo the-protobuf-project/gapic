@@ -21,13 +21,15 @@ STATE_FILE="${ROOT}/.released-versions.json"
 GO_MANIFEST="${ROOT}/gapic-go/.release-please-manifest.json"
 TS_PKG="${ROOT}/gapic-node/core/generator/gapic-generator-typescript/package.json"
 PY_SETUP="${ROOT}/gapic-python/packages/gapic-generator/setup.py"
+RS_MANIFEST="${ROOT}/gapic-rust/.release-please-manifest.json"
 
 # --- read current upstream versions ---------------------------------------
 go_version="$(jq -r '."."' "${GO_MANIFEST}")"
 ts_version="$(jq -r '.version' "${TS_PKG}")"
 py_version="$(sed -nE 's/^version = "([^"]+)".*/\1/p' "${PY_SETUP}" | head -n1)"
+rs_version="$(jq -r '."."' "${RS_MANIFEST}")"
 
-for kv in "go:${go_version}" "ts:${ts_version}" "py:${py_version}"; do
+for kv in "go:${go_version}" "ts:${ts_version}" "py:${py_version}" "rs:${rs_version}"; do
   if [[ -z "${kv#*:}" || "${kv#*:}" == "null" ]]; then
     echo "ERROR: could not read ${kv%%:*} version" >&2
     exit 1
@@ -39,8 +41,9 @@ if [[ -f "${STATE_FILE}" ]]; then
   go_released="$(jq -r '.go // ""' "${STATE_FILE}")"
   ts_released="$(jq -r '.ts // ""' "${STATE_FILE}")"
   py_released="$(jq -r '.py // ""' "${STATE_FILE}")"
+  rs_released="$(jq -r '.rs // ""' "${STATE_FILE}")"
 else
-  go_released="" ts_released="" py_released=""
+  go_released="" ts_released="" py_released="" rs_released=""
 fi
 
 emit() { # name current released
@@ -58,3 +61,4 @@ emit() { # name current released
 emit go "${go_version}" "${go_released}"
 emit ts "${ts_version}" "${ts_released}"
 emit py "${py_version}" "${py_released}"
+emit rs "${rs_version}" "${rs_released}"
