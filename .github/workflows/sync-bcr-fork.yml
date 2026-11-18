@@ -1,0 +1,61 @@
+name: Sync bazel-central-registry fork
+
+# Keeps the-protobuf-project/bazel-central-registry's main identical to
+# bazelbuild/bazel-central-registry's main, daily, so module branches for
+# BCR pull requests start from a current registry without a manual "Sync
+# fork".
+#
+# It lives here, not in the fork: a workflow committed to the fork's main
+# would be a commit upstream does not have, carried into every branch cut
+# from main and so into every pull request to bazelbuild.
+#
+# main is only fast-forwarded: when it has commits of its own the job fails
+# instead of merging, so it never drifts from upstream unnoticed (move those
+# commits to a branch, then rerun). RELEASE_PAT (repo and workflow scopes)
+# makes the update, as upstream's commits change its .github/workflows,
+# which the default GITHUB_TOKEN may not write.
+
+on:
+  schedule:
+    - cron: '23 4 * * *' # daily at 04:23 UTC
+  workflow_dispatch: {} # manual "sync now" button
+
+permissions: {}
+
+concurrency:
+  group: sync-bcr-fork
+  cancel-in-progress: false
+
+env:
+  FORK: the-protobuf-project/bazel-central-registry
+  UPSTREAM: bazelbuild/bazel-central-registry
+  BRANCH: main
+
+jobs:
+  sync:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - name: Fast-forward the fork's main to upstream
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          set -euo pipefail
+          # Commits on the fork's main that upstream lacks, and the reverse.
+          read -r ahead behind < <(gh api "repos/$UPSTREAM/compare/$BRANCH...${FORK%%/*}:$BRANCH" \
+            --jq '"\(.ahead_by) \(.behind_by)"')
+          echo "fork $BRANCH: $ahead ahead of upstream, $behind behind"
+          if [ "$ahead" -gt 0 ]; then
+            echo "::error::$FORK's $BRANCH has $ahead commit(s) upstream does not; move them to a branch, then rerun"
+            exit 1
+          fi
+          if [ "$behind" -eq 0 ]; then
+            echo "Already up to date."
+            exit 0
+          fi
+          result="$(gh api -X POST "repos/$FORK/merge-upstream" -f branch="$BRANCH" --jq .merge_type)"
+          if [ "$result" != fast-forward ]; then
+            echo "::error::expected a fast-forward, got '$result'"
+            exit 1
+          fi
+          head="$(gh api "repos/$FORK/commits/$BRANCH" --jq .sha)"
+          echo "Fast-forwarded $FORK's $BRANCH by $behind commit(s) to ${head:0:12}." | tee -a "$GITHUB_STEP_SUMMARY"

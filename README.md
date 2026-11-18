@@ -190,6 +190,16 @@ gh workflow run sync.yml -R the-protobuf-project/gapic
 gh api repos/the-protobuf-project/gapic/dispatches -f event_type=sync
 ```
 
+## Bazel Central Registry fork
+
+[`sync-bcr-fork.yml`](.github/workflows/sync-bcr-fork.yml) fast-forwards
+[the-protobuf-project/bazel-central-registry](https://github.com/the-protobuf-project/bazel-central-registry)'s
+`main` to [bazelbuild/bazel-central-registry](https://github.com/bazelbuild/bazel-central-registry)'s
+every day (04:23 UTC, or **Actions → Sync bazel-central-registry fork → Run
+workflow**), so module branches start from a current registry. It fails rather
+than merge when the fork's `main` has commits of its own; keep those on
+branches.
+
 ## Copyright
 
 Maintained under the [the-protobuf-project](https://github.com/the-protobuf-project) org.
